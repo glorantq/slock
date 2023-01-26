@@ -405,8 +405,6 @@ main(int argc, char **argv) {
 	case 'v':
 		fprintf(stderr, "slock-"VERSION"\n");
 		return 0;
-	default:
-		usage();
 	} ARGEND
 
 	/* validate drop-user and -group */
