@@ -1,0 +1,25 @@
+/* user and group to drop privileges to */
+static const char *user  = "nobody";
+static const char *group = "nobody";
+
+static const char *colorname[NUMCOLS] = {
+	[INIT] =   "#444444",     /* after initialization */
+	[INPUT] =  "#6e85b7",   /* during input */
+	[FAILED] = "#E97777",   /* wrong password */
+	[CAPS] = "#FEBE8C",         /* CapsLock on */
+};
+
+/* treat a cleared input like a wrong password (color) */
+static const int failonclear = 0;
+
+/* allow control key to trigger fail on clear */
+static const int controlkeyclear = 1;
+
+/* default message */
+static const char * message = "";
+
+/* text color */
+static const char * text_color = "#ffffff";
+
+/* text size (must be a valid size) */
+static const char * font_name = "-misc-tamsyn-bold-r-normal--16-116-100-100-c-80-iso8859-1";
