@@ -29,6 +29,7 @@
 char *argv0;
 
 enum {
+	BG,
 	INIT,
 	INPUT,
 	FAILED,
@@ -42,6 +43,8 @@ struct lock {
 	Pixmap pmap;
 	Pixmap bgmap;
 	unsigned long colors[NUMCOLS];
+	GC gc;
+	XRRScreenResources *rrsr;
 };
 
 struct xrandr {
@@ -133,6 +136,48 @@ gethash(void)
 }
 
 static void
+draw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
+     unsigned int color)
+{
+	int screen, crtc;
+	XRRCrtcInfo* rrci;
+
+	if (rr->active) {
+		for (screen = 0; screen < nscreens; screen++) {
+			if(locks[screen]->bgmap)
+                        XSetWindowBackgroundPixmap(dpy, locks[screen]->win, locks[screen]->bgmap);
+                    else
+                        XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[0]);
+
+			XClearWindow(dpy, locks[screen]->win);
+			XSetForeground(dpy, locks[screen]->gc, locks[screen]->colors[color]);
+			for (crtc = 0; crtc < locks[screen]->rrsr->ncrtc; ++crtc) {
+				rrci = XRRGetCrtcInfo(dpy,
+				                      locks[screen]->rrsr,
+				                      locks[screen]->rrsr->crtcs[crtc]);
+				/* skip disabled crtc */
+				if (rrci->noutput > 0)
+					XFillRectangle(dpy,
+					               locks[screen]->win,
+					               locks[screen]->gc,
+					               rrci->x + (rrci->width - squaresize) / 2,
+					               rrci->y + (rrci->height - squaresize) / 2,
+					               squaresize,
+					               squaresize);
+				XRRFreeCrtcInfo(rrci);
+			}
+		}
+	} else {
+		for (screen = 0; screen < nscreens; screen++) {
+			XSetWindowBackground(dpy,
+			                     locks[screen]->win,
+			                     locks[screen]->colors[color]);
+			XClearWindow(dpy, locks[screen]->win);
+		}
+	}
+}
+
+static void
 readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
        const char *hash)
 {
@@ -216,13 +261,7 @@ readpw(Display *dpy, struct xrandr *rr, struct lock **locks, int nscreens,
 			}
 			color = len ? (caps ? CAPS : INPUT) : (failure || failonclear ? FAILED : INIT);
 			if (running && oldc != color) {
-				for (screen = 0; screen < nscreens; screen++) {
-                    if(locks[screen]->bgmap)
-                        XSetWindowBackgroundPixmap(dpy, locks[screen]->win, locks[screen]->bgmap);
-                    else
-                        XSetWindowBackground(dpy, locks[screen]->win, locks[screen]->colors[0]);
-					XClearWindow(dpy, locks[screen]->win);
-				}
+					draw(dpy, rr, locks, nscreens, color);
 				oldc = color;
 			}
 		} else if (rr->active && ev.type == rr->evbase + RRScreenChangeNotify) {
@@ -256,6 +295,7 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 	XColor color, dummy;
 	XSetWindowAttributes wa;
 	Cursor invisible;
+	XGCValues gcvalues;
 
 	if (dpy == NULL || screen < 0 || !(lock = malloc(sizeof(struct lock))))
 		return NULL;
@@ -282,7 +322,7 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 
 	/* init */
 	wa.override_redirect = 1;
-	wa.background_pixel = lock->colors[INIT];
+	wa.background_pixel = lock->colors[BG];
 	lock->win = XCreateWindow(dpy, lock->root, 0, 0,
 	                          DisplayWidth(dpy, lock->screen),
 	                          DisplayHeight(dpy, lock->screen),
@@ -296,6 +336,10 @@ lockscreen(Display *dpy, struct xrandr *rr, int screen)
 	invisible = XCreatePixmapCursor(dpy, lock->pmap, lock->pmap,
 	                                &color, &color, 0, 0);
 	XDefineCursor(dpy, lock->win, invisible);
+	lock->gc = XCreateGC(dpy, lock->win, 0, &gcvalues);
+	XSetForeground(dpy, lock->gc, lock->colors[INIT]);
+	if (rr->active)
+		lock->rrsr = XRRGetScreenResourcesCurrent(dpy, lock->root);
 
 	/* Try to grab mouse pointer *and* keyboard for 600ms, else fail the lock */
 	for (i = 0, ptgrab = kbgrab = -1; i < 6; i++) {
@@ -497,6 +541,9 @@ main(int argc, char **argv) {
 			_exit(1);
 		}
 	}
+
+	/* draw the initial rectangle */
+	draw(dpy, &rr, locks, nscreens, INIT);
 
 	/* everything is now blank. Wait for the correct password */
 	readpw(dpy, &rr, locks, nscreens, hash);
