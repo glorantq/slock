@@ -4,14 +4,14 @@ static const char *user  = "nobody";
 static const char *group = "nogroup";
 
 static const char *colorname[NUMCOLS] = {
-	[INIT] =   "black",     /* after initialization */
-	[INPUT] =  "#005577",   /* during input */
-	[FAILED] = "#CC3333",   /* wrong password */
-	[CAPS] = "red",         /* CapsLock on */
+	[INIT] =   "#444444",     /* after initialization */
+	[INPUT] =  "#6e85b7",   /* during input */
+	[FAILED] = "#E97777",   /* wrong password */
+	[CAPS] = "#FEBE8C",         /* CapsLock on */
 };
 
 /* treat a cleared input like a wrong password (color) */
-static const int failonclear = 1;
+static const int failonclear = 0;
 
 /*Enable blur*/
 #define BLUR
